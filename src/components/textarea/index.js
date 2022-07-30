@@ -13,7 +13,7 @@ const TextArea = styled.textarea`
   font-size: 18px;
   padding: 24px 12px 8px 15px;
   display: block;
-  width: 400px;
+  width: 300px;
   height: 120px;
   border: 1px solid #757575;
   outline: none;
@@ -27,6 +27,9 @@ const TextArea = styled.textarea`
 	&.filled {
 		border-color: #1BD97B;
 		font-size: 15px;
+	}
+	@media (max-width: 600px) {
+		width: 174px;
 	}
 `;
 

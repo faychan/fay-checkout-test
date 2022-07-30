@@ -13,6 +13,18 @@ const Wrapper = styled.div`
 	height: 70px;
 	max-width: 600px;
   color: #FF8A00;
+	@media (max-width: 600px) {
+		width: calc(100% - 120px);
+		left: 88px;
+    justify-content: flex-start;
+    text-align: left;
+    grid-row-gap: 24px;
+    border-radius: 0 0 0 35%;
+    height: 120px;
+    padding-bottom: 48px;
+    padding-left: 31px;
+		grid-template-columns: 100%;
+	}
 `;
 
 const StepWrapper = styled.div`
@@ -20,6 +32,9 @@ const StepWrapper = styled.div`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
+	@media (max-width: 600px) {
+		justify-content: flex-start;
+	}
 `;
 
 const StepNumber = styled.div`

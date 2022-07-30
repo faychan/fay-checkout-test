@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 
 import ContainedInput from './components/input';
 
@@ -15,6 +15,7 @@ import { FlexContainer, FlexItem } from "./components/flex";
 import { ButtonPrimary } from "./components/button";
 import PaymentBox from "./components/paymentBox";
 import { CenterContainer, CenterItem } from "./components/centerContainer";
+import Cookies from "js-cookie";
 
 const App = () => {
 
@@ -59,7 +60,7 @@ const App = () => {
     }
   ]
 
-  const { register, handleSubmit, setValue, trigger, control, reset, watch, formState: { errors } } = useForm({mode: "all"});
+  const { register, handleSubmit, setValue, trigger, setError, clearErrors, control, reset, watch, formState: { errors } } = useForm({mode: "all"});
 
   const watchAllFields = watch();
 
@@ -71,8 +72,13 @@ const App = () => {
   }, [watchAllFields?.as_dropshipper]);
 
   useEffect(() => {
-    register('shipment', { required: true });
     register('payment', { required: true });
+    register('shipment', { required: true });
+    let data = Cookies.get("data");
+    if(data?.length > 0){
+      data = JSON.parse(data)
+      reset(data);
+    }
   }, []);
 
   const addCommas = (nStr) => {
@@ -89,21 +95,35 @@ const App = () => {
     return x1 + x2;
   };
 
-  const validate = async () => {
+  const validate1 = async () => {
     let result;
-    if(stepActive === 1){
-      if(watchAllFields.as_dropshipper){
-        result = await trigger("email", "phone_number", "delivery_address", "dropshipper_name", "dropshipper_phone_number");
-      } else {
-        result = await trigger("email", "phone_number", "delivery_address");
-      }
-    } else if(stepActive === 2){
-      result = await trigger("shipment", "payment");
+    if(watchAllFields.as_dropshipper){
+      result = await trigger("email", "phone_number", "delivery_address", "dropshipper_name", "dropshipper_phone_number");
+    } else {
+      result = await trigger("email", "phone_number", "delivery_address");
     }
     if(result){
       setStepActive((step) => step + 1);
     }
   };
+
+  const validate2 = (listener) => {
+    clearErrors(["shipment", "payment"])
+    if(watchAllFields.shipment?.id && watchAllFields.payment?.id && listener === "onsubmit"){
+      setStepActive((step) => step + 1);
+    } else {
+      if(!watchAllFields.shipment?.id){
+        setError('shipment', { type: 'custom', message: 'Required' });
+      }
+      if(!watchAllFields.payment?.id){
+        setError('payment', { type: 'custom', message: 'Required' });
+      }
+    }
+  }
+
+  useEffect(() => {
+    validate2("onchange");
+  }, [watchAllFields?.shipment, watchAllFields?.payment])
 
   useEffect(() => {
     if(stepActive === 3){
@@ -119,11 +139,16 @@ const App = () => {
       delivery_address: "",
       dropshipper_name: "",
       dropshipper_phone_number: "",
-      shipment: {},
-      payment: {},
+      shipment: "",
+      payment: "",
     });
     setStepActive(1);
-  }
+  };
+
+  useEffect(() => {
+    let data = JSON.stringify(watchAllFields);
+    Cookies.set("data", data);
+  }, [watchAllFields]);
   
   return (
     <div className="App">
@@ -131,7 +156,7 @@ const App = () => {
         <Steps active={stepActive} />
         {
           stepActive !== 3 ?
-            <div onClick={() => setStepActive((step) => step > 1 ? step - 1 : step)} style={{ display: "flex", alignItems: "center", cursor: "pointer"}}>
+            <div onClick={() => setStepActive((step) => step > 1 ? step - 1 : step)} style={{ marginTop: window.innerWidth < 600 ? "120px" : "", display: "flex", alignItems: "center", cursor: "pointer"}}>
               <span className="material-symbols-outlined">
                 arrow_back_ios_new
               </span>
@@ -187,7 +212,7 @@ const App = () => {
                     )}
                     name="phone_number"
                     control={control}
-                    rules={{ pattern: /[0-9\+\-\(\)]{6,20}$/ }}
+                    rules={{ required: true, minLength: 6, maxLength: 20, pattern: /[0-9\+\-\(\)]{6,20}$/ }}
                   />
                   <Controller
                     render={({
@@ -272,7 +297,7 @@ const App = () => {
                     rules={{ required: watchAllFields?.as_dropshipper, pattern: /[0-9\+\-\(\)]{6,20}$/ }}
                   />
                 </GridItem>
-                <GridItem style={{ borderLeft: "1px solid #FF8A00", padding: "0 19px" }}>
+                <GridItem>
                   <Heading label="Summary" as="h4" boxStyle={{ marginBottom: "-12px" }}/>
                   <TextContainer label="10 items purchased" className="on-desktop-space" />
                   <FlexContainer style={{ marginBottom: "13px"}}>
@@ -299,30 +324,40 @@ const App = () => {
                       <Heading label={watchAllFields.as_dropshipper ? "505,900" : "500,000"} as="h4"/>
                     </FlexItem>
                   </FlexContainer>
-                  <ButtonPrimary onClick={validate}>Continue as Payment</ButtonPrimary>
+                  <ButtonPrimary onClick={validate1}>Continue as Payment</ButtonPrimary>
                 </GridItem>
               </GridContainer>
             : stepActive === 2 ? 
               <GridContainerSize2 size={2}>
                 <GridItem>
                   <Heading as="h2" label="Shipment"/>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", justifyContent: "flex-start" }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px", justifyContent: "flex-start" }}>
                     {
                       deliveryOptionsData.map(dod => {
-                        return <PaymentBox onClick={() => setValue("shipment", dod)} name={dod.name} price={addCommas(dod.price)} active={watchAllFields?.shipment?.id === dod.id} />
+                        return <PaymentBox key={"shipment-"+dod.id} onClick={() => setValue("shipment", dod)} name={dod.name} price={addCommas(dod.price)} active={watchAllFields?.shipment?.id === dod.id} />
                       })
                     }
                   </div>
+                  {
+                    errors?.shipment ? 
+                      <p style={{ fontSize: "12px", color: "red"}}>Required</p>
+                    : null
+                  }
                   <Heading as="h2" label="Payment" boxStyle={{ marginTop: "60px" }}/>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", justifyContent: "flex-start" }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px", justifyContent: "flex-start" }}>
                     {
                       paymentOptionsData.map(pod => {
-                        return <PaymentBox onClick={() => setValue("payment", pod)} name={pod.name} price={pod.price} active={watchAllFields?.payment?.id === pod.id} />
+                        return <PaymentBox key={"payment-"+pod.id} onClick={() => setValue("payment", pod)} name={pod.name} price={pod.price} active={watchAllFields?.payment?.id === pod.id} />
                       })
                     }
                   </div>
+                  {
+                    errors?.payment ? 
+                      <p style={{ fontSize: "12px", color: "red"}}>Required</p>
+                    : null
+                  }
                 </GridItem>
-                <GridItem style={{ borderLeft: "1px solid #FF8A00", padding: "0 19px" }}>
+                <GridItem>
                   <Heading label="Summary" as="h4" boxStyle={{ marginBottom: "-12px" }}/>
                   <TextContainer label="10 items purchased" style={{ marginBottom: "20px", borderBottom: "1px solid #CCCCC"}} />
                   <TextContainer label="Delivery Estimation" style={{ marginBottom: "5px"}} />
@@ -363,7 +398,7 @@ const App = () => {
                       <Heading label={watchAllFields.as_dropshipper ? addCommas(505900+(watchAllFields?.shipment?.price || 0)) : addCommas(500000+(watchAllFields?.shipment?.price || 0))} as="h4"/>
                     </FlexItem>
                   </FlexContainer>
-                  <ButtonPrimary onClick={validate}>Pay with {watchAllFields?.payment?.name}</ButtonPrimary>
+                  <ButtonPrimary onClick={() => validate2("onsubmit")}>Pay with {watchAllFields?.payment?.name}</ButtonPrimary>
                 </GridItem>
               </GridContainerSize2>
             : stepActive === 3 ?
@@ -383,7 +418,7 @@ const App = () => {
                   </CenterItem>
                 </CenterContainer>
               </GridItem>
-              <GridItem style={{ borderLeft: "1px solid #FF8A00", padding: "0 19px" }}>
+              <GridItem>
                   <Heading label="Summary" as="h4" boxStyle={{ marginBottom: "-12px" }}/>
                   <TextContainer label="10 items purchased" style={{ marginBottom: "22px", borderBottom: "1px solid #CCCCC"}} />
                   <TextContainer label="Delivery Estimation" style={{ marginTop: "22px", marginBottom: "5px"}} />
